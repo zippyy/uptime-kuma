@@ -292,7 +292,7 @@ class Notification {
 
     /**
      * Delete a notification
-     * @param {object} notificationID ID of notification to delete
+     * @param {number} notificationID ID of notification to delete
      * @param {number} userID ID of user who created notification
      * @returns {Promise<void>}
      */
