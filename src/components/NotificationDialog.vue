@@ -280,6 +280,7 @@ export default {
                 SMSPartner: "SMS Partner",
                 telnyx: "Telnyx",
                 Teltonika: this.$t("Teltonika SMS Gateway"),
+                Textbelt: "Textbelt",
                 twilio: "Twilio",
             };
 
