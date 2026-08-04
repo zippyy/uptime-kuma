@@ -79,6 +79,7 @@ const SMSManager = require("./notification-providers/smsmanager");
 const ServerChan = require("./notification-providers/serverchan");
 const ZohoCliq = require("./notification-providers/zoho-cliq");
 const SevenIO = require("./notification-providers/sevenio");
+const Textbelt = require("./notification-providers/textbelt");
 const Whapi = require("./notification-providers/whapi");
 const WAHA = require("./notification-providers/waha");
 const Evolution = require("./notification-providers/evolution");
@@ -198,6 +199,7 @@ class Notification {
             new GoAlert(),
             new ZohoCliq(),
             new SevenIO(),
+            new Textbelt(),
             new Whapi(),
             new WAHA(),
             new Evolution(),
