@@ -1,15 +1,15 @@
 name: Publish to Docker Hub
 
 # Builds this fork (upstream uptime-kuma + the Textbelt notification provider)
-# and publishes it to Docker Hub as zippyy/uptime-kuma.
+# and publishes it to Docker Hub as zippyyy/uptime-kuma.
 #
-#   push to master        -> latest, master, sha-<shortsha>
+#   push to master        -> latest, master, 2.5.0-textbelt, sha-<shortsha>
 #   tag v<semver>         -> x.y.z, x.y, x, latest
 #   pull request          -> build-only validation, nothing published
 #   workflow_dispatch     -> master publishes; any other branch builds only
 #
 # Required repository secrets (Settings -> Secrets and variables -> Actions):
-#   DOCKERHUB_USERNAME  Docker Hub account name (zippyy)
+#   DOCKERHUB_USERNAME  Docker Hub account name (zippyyy)
 #   DOCKERHUB_TOKEN     Docker Hub access token with Read & Write scope
 #
 # Note: the upstream build-docker-push.yml in this repo is gated to
@@ -30,7 +30,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE_NAME: zippyy/uptime-kuma
+  IMAGE_NAME: zippyyy/uptime-kuma
   NODE_VERSION: '24'
 
 jobs:
@@ -81,6 +81,8 @@ jobs:
             # latest is updated by master pushes and by stable v* tags; PRs and
             # arbitrary-branch manual runs never touch it.
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
+            # explicit fork marker: upstream version + this fork's extra provider
+            type=raw,value=2.5.0-textbelt,enable=${{ github.ref == 'refs/heads/master' }}
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
