@@ -1,0 +1,103 @@
+name: Publish to Docker Hub
+
+# Builds this fork (upstream uptime-kuma + the Textbelt notification provider)
+# and publishes it to Docker Hub as zippyy/uptime-kuma.
+#
+#   push to master        -> latest, master, sha-<shortsha>
+#   tag v<semver>         -> x.y.z, x.y, x, latest
+#   pull request          -> build-only validation, nothing published
+#   workflow_dispatch     -> master publishes; any other branch builds only
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   DOCKERHUB_USERNAME  Docker Hub account name (zippyy)
+#   DOCKERHUB_TOKEN     Docker Hub access token with Read & Write scope
+#
+# Note: the upstream build-docker-push.yml in this repo is gated to
+# louislam/uptime-kuma and does nothing on a fork -- this workflow is the fork's
+# publishing path and does not touch any upstream-tracked file.
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dockerhub-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: zippyy/uptime-kuma
+  NODE_VERSION: '24'
+
+jobs:
+  build-and-publish:
+    name: Build and publish multi-arch image
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # The release stage of docker/dockerfile packages the frontend that is
+      # built on the host, so the Vite build has to run before docker build.
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm clean-install --no-fund
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Only authenticate when this run is allowed to publish: pushes to master,
+      # version tags, and manual runs on master. PRs never touch the credentials.
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            # latest is updated by master pushes and by stable v* tags; PRs and
+            # arbitrary-branch manual runs never touch it.
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./docker/dockerfile
+          target: release
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')) }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
