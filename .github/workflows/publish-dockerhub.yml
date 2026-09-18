@@ -3,7 +3,7 @@ name: Publish to Docker Hub
 # Builds this fork (upstream uptime-kuma + the Textbelt notification provider)
 # and publishes it to Docker Hub as zippyyy/uptime-kuma.
 #
-#   push to master        -> latest, master, 2.5.0-textbelt, sha-<shortsha>
+#   push to master        -> latest, master, <version>-textbelt, sha-<shortsha>
 #   tag v<semver>         -> x.y.z, x.y, x, latest
 #   pull request          -> build-only validation, nothing published
 #   workflow_dispatch     -> master publishes; any other branch builds only
@@ -31,7 +31,9 @@ concurrency:
 
 env:
   IMAGE_NAME: zippyyy/uptime-kuma
-  NODE_VERSION: '24'
+  # upstream master (3.0.0-beta.0) requires node >= 26.2.0; 2.5.x builds fine on
+  # 26 too, so this single value works for either tree.
+  NODE_VERSION: '26'
 
 jobs:
   build-and-publish:
@@ -57,6 +59,11 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      # Derive the fork marker tag from package.json so it can never go stale
+      # after an upstream merge (e.g. 2.5.0-textbelt -> 3.0.0-beta.0-textbelt).
+      - name: Read version from package.json
+        run: echo "PKG_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
 
@@ -81,8 +88,8 @@ jobs:
             # latest is updated by master pushes and by stable v* tags; PRs and
             # arbitrary-branch manual runs never touch it.
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
-            # explicit fork marker: upstream version + this fork's extra provider
-            type=raw,value=2.5.0-textbelt,enable=${{ github.ref == 'refs/heads/master' }}
+            # explicit fork marker: current package.json version + this fork's extra provider
+            type=raw,value=${{ env.PKG_VERSION }}-textbelt,enable=${{ github.ref == 'refs/heads/master' }}
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
